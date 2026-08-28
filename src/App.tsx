@@ -13,6 +13,8 @@ import { useRaceData } from "./hooks/useRaceData"
 import { buildTimingRows, buildTimingRowsAtLap } from "./services/raceData"
 import { formatLapTime } from "./utils/format"
 import ReplayBar from "./components/ReplayBar"
+import HistoricalBar from "./components/HistoricalBar"
+import { backend } from "./services/backend"
 
 export default function App() {
   const { sessionData, sessions, loading, error, selectedSessionKey, setSelectedSessionKey, selectedYear, setSelectedYear, load, dataSourceMode, setDataSourceMode } = useRaceData()
@@ -24,6 +26,10 @@ export default function App() {
   const [replayLap, setReplayLap] = useState<number | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [replaySpeed, setReplaySpeed] = useState(1)
+  const [dataMode, setDataMode] = useState<"LIVE"|"HISTORICAL"|"DEMO">("LIVE")
+  const [hist, setHist] = useState({year:2024, gp:"Italian Grand Prix", session:"R"})
+  const [histLaps, setHistLaps] = useState<any[]|null>(null)
+  const [backendOk, setBackendOk] = useState<boolean|null>(null)
   const prevPosRef = useRef<Map<number,number>>(new Map())
 
   useEffect(()=>{
@@ -33,6 +39,19 @@ export default function App() {
     }
     window.addEventListener("keydown", h); return ()=>window.removeEventListener("keydown",h)
   }, [])
+
+  useEffect(()=>{ backend.health().then(h=>setBackendOk(!!h)).catch(()=>setBackendOk(false)) }, [])
+  useEffect(()=>{
+    if (dataMode==="DEMO") setDataSourceMode("demo")
+    else if (dataMode==="LIVE") setDataSourceMode("auto")
+    else setDataSourceMode("auto")
+  }, [dataMode, setDataSourceMode])
+
+  useEffect(()=>{
+    if (dataMode!=="HISTORICAL") { setHistLaps(null); return }
+    setHistLaps(null)
+    backend.getFastF1Laps(hist.year, hist.gp, hist.session).then(setHistLaps).catch(()=>setHistLaps([]))
+  }, [dataMode, hist.year, hist.gp, hist.session])
 
   const currentLap = useMemo(()=>{
     if (!sessionData?.laps.length) return 1
@@ -205,10 +224,28 @@ export default function App() {
         <div className="flex items-center gap-3 text-[11px] font-mono">
           <span className="hidden sm:inline-flex items-center gap-2 px-2 py-1 rounded bg-white/5 border border-white/10"><span className="w-2 h-2 rounded-full bg-[#e10600]"/> FASTEST LAP {fastest ? `${fastest.driver.abbreviation} ${formatLapTime(fastest.bestLap?.lapDuration)}` : "—"}</span>
           <span className="hidden md:inline-flex items-center gap-1.5 text-zinc-500">DRS <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">ENABLED</span></span>
+          {backendOk===false && <span className="px-2 py-1 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold tracking-widest text-[10px]">BACKEND OFFLINE — OpenF1 direct</span>}
+          {backendOk && <span className="px-2 py-1 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold tracking-widest text-[10px]">BACKEND ● FastF1 ready</span>}
           {sessionData?.dataSource==="demo" && <span className="px-2 py-1 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold tracking-widest text-[10px]">DEMO MODE</span>}
           {sessionData?.status==="offline" && <span className="px-2 py-1 rounded bg-red-500/15 text-red-400 border border-red-500/30 font-bold tracking-widest text-[10px]">OFFLINE • DEMO FALLBACK</span>}
         </div>
       </div>
+
+      <div className="px-4 lg:px-6 pt-3 flex flex-wrap gap-2">
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-[#0f0f12] border border-white/10">
+          {(["LIVE","HISTORICAL","DEMO"] as const).map(m=>(
+            <button key={m} onClick={()=>setDataMode(m)} className={`px-3 py-1.5 rounded text-xs font-mono font-bold tracking-widest ${dataMode===m?"bg-white text-black":"text-zinc-500 hover:text-zinc-300"}`}>{m}</button>
+          ))}
+        </div>
+        <span className="text-[11px] font-mono text-zinc-600 self-center hidden sm:inline">OpenF1 → live heartbeat • FastF1 → deep analysis brain • Normalized API</span>
+      </div>
+
+      {dataMode==="HISTORICAL" && (
+        <div className="px-4 lg:px-6 pt-3">
+          <HistoricalBar year={hist.year} gp={hist.gp} session={hist.session} onChange={setHist} />
+          {histLaps && <div className="mt-2 text-[11px] font-mono text-zinc-500">{histLaps.length ? `${histLaps.length} laps via FastF1 cache` : "No laps — try another GP/session or install FastF1"} • <button onClick={()=>navigator.clipboard.writeText(JSON.stringify(histLaps.slice(0,2),null,2))} className="underline">copy sample</button></div>}
+        </div>
+      )}
 
       {/* Replay bar — fully view old races lap-by-lap */}
       <div className="px-4 lg:px-6 pt-3">
