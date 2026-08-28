@@ -14,6 +14,8 @@ import { buildTimingRows, buildTimingRowsAtLap } from "./services/raceData"
 import { formatLapTime } from "./utils/format"
 import ReplayBar from "./components/ReplayBar"
 import HistoricalBar from "./components/HistoricalBar"
+import TrackMap from "./components/TrackMap"
+import TelemetryTrace from "./components/TelemetryTrace"
 import { backend } from "./services/backend"
 
 export default function App() {
@@ -304,6 +306,7 @@ export default function App() {
 
             <div className="col-span-12 lg:col-span-4 xl:col-span-4 space-y-4">
               <TrackStatus weather={sessionData?.weather ?? null} raceControl={sessionData?.raceControl ?? []} lap={currentLap} totalLaps={totalLaps} />
+              <TrackMap circuit={sessionData?.session?.circuitShortName ?? "Unknown"} />
               {selectedRow && (
                 <LapDelta
                   driverAbbr={selectedRow.driver.abbreviation}
@@ -362,12 +365,17 @@ export default function App() {
               {!timingRows.length && <span className="text-xs font-mono text-zinc-600 px-2">No drivers</span>}
             </div>
             <div className="grid grid-cols-12 gap-6">
-              <div className="col-span-12 lg:col-span-8">
+              <div className="col-span-12 lg:col-span-8 space-y-4">
                 <LapGraph laps={sessionData?.laps.filter(l=>l.driverNumber===effectiveSelectedDriver) ?? []} driverAbbr={selectedRow?.driver.abbreviation ?? "—"} selectedLap={selectedLapNumber} onSelectLap={setSelectedLapNumber} />
+                {dataMode==="HISTORICAL" && selectedRow && selectedLapNumber && (
+                  <TelemetryTrace year={hist.year} gp={hist.gp} session={hist.session} driver={selectedRow.driver.abbreviation} lap={selectedLapNumber} compareDriver={compareRow?.driver.abbreviation} compareLap={compareRow ? selectedLapNumber : undefined} />
+                )}
+                {dataMode!=="HISTORICAL" && <div className="panel rounded-lg p-3 text-xs font-mono text-zinc-600">Switch to <span className="text-white font-bold">HISTORICAL</span> to load FastF1 speed/throttle/brake/gear/rpm traces (cached, on demand)</div>}
               </div>
-              <div className="col-span-12 lg:col-span-4">
+              <div className="col-span-12 lg:col-span-4 space-y-4">
                 <DriverDetail row={selectedRow ? {...selectedRow, lastLap: currentLapData, bestLap: selectedRow.bestLap } : null} onClose={()=>setCompareDriver(null)} />
-                <div className="panel rounded-lg p-4 mt-4">
+                <TrackMap circuit={sessionData?.session?.circuitShortName ?? "Unknown"} />
+                <div className="panel rounded-lg p-4">
                   <div className="text-xs font-mono tracking-widest text-zinc-500">TELEMETRY STREAM</div>
                   <div className="text-xs font-mono text-zinc-600 mt-2">Browse laps via graph or delta picker. Older laps are accessible via brush/list. OpenF1 car_data polled separately when live. Select driver above — tower is in TIMING tab.</div>
                 </div>
