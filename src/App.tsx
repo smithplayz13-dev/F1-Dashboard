@@ -352,15 +352,25 @@ export default function App() {
         )}
 
         {view==="TELEMETRY" && (
-          <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-12 lg:col-span-8">
-              <LapGraph laps={sessionData?.laps.filter(l=>l.driverNumber===effectiveSelectedDriver) ?? []} driverAbbr={selectedRow?.driver.abbreviation ?? "—"} selectedLap={selectedLapNumber} onSelectLap={setSelectedLapNumber} />
+          <div className="space-y-4">
+            <div className="panel rounded-lg p-2 flex gap-1.5 overflow-x-auto">
+              {timingRows.map(r=>(
+                <button key={r.driver.driverNumber} onClick={()=>setSelectedDriver(r.driver.driverNumber)} className={`shrink-0 px-2.5 py-1.5 rounded text-xs font-mono font-bold border flex items-center gap-1.5 ${effectiveSelectedDriver===r.driver.driverNumber ? "bg-white text-black border-white" : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10"}`}>
+                  <span className="w-2 h-2 rounded-full" style={{background:r.driver.teamColor}} />{r.driver.abbreviation} <span className="text-[10px] opacity-60">P{r.position===99?"—":r.position}</span>
+                </button>
+              ))}
+              {!timingRows.length && <span className="text-xs font-mono text-zinc-600 px-2">No drivers</span>}
             </div>
-            <div className="col-span-12 lg:col-span-4">
-              <DriverDetail row={selectedRow ? {...selectedRow, lastLap: currentLapData, bestLap: selectedRow.bestLap } : null} onClose={()=>setCompareDriver(null)} />
-              <div className="panel rounded-lg p-4 mt-4">
-                <div className="text-xs font-mono tracking-widest text-zinc-500">TELEMETRY STREAM</div>
-                <div className="text-xs font-mono text-zinc-600 mt-2">Browse laps via graph or delta picker. Older laps are accessible via brush/list. OpenF1 car_data polled separately when live.</div>
+            <div className="grid grid-cols-12 gap-6">
+              <div className="col-span-12 lg:col-span-8">
+                <LapGraph laps={sessionData?.laps.filter(l=>l.driverNumber===effectiveSelectedDriver) ?? []} driverAbbr={selectedRow?.driver.abbreviation ?? "—"} selectedLap={selectedLapNumber} onSelectLap={setSelectedLapNumber} />
+              </div>
+              <div className="col-span-12 lg:col-span-4">
+                <DriverDetail row={selectedRow ? {...selectedRow, lastLap: currentLapData, bestLap: selectedRow.bestLap } : null} onClose={()=>setCompareDriver(null)} />
+                <div className="panel rounded-lg p-4 mt-4">
+                  <div className="text-xs font-mono tracking-widest text-zinc-500">TELEMETRY STREAM</div>
+                  <div className="text-xs font-mono text-zinc-600 mt-2">Browse laps via graph or delta picker. Older laps are accessible via brush/list. OpenF1 car_data polled separately when live. Select driver above — tower is in TIMING tab.</div>
+                </div>
               </div>
             </div>
           </div>
