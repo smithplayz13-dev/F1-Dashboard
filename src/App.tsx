@@ -241,9 +241,37 @@ export default function App() {
       </div>
 
       {dataMode==="HISTORICAL" && (
-        <div className="px-4 lg:px-6 pt-3">
+        <div className="px-4 lg:px-6 pt-3 space-y-2">
           <HistoricalBar year={hist.year} gp={hist.gp} session={hist.session} onChange={setHist} />
-          {histLaps && <div className="mt-2 text-[11px] font-mono text-zinc-500">{histLaps.length ? `${histLaps.length} laps via FastF1 cache` : "No laps — try another GP/session or install FastF1"} • <button onClick={()=>navigator.clipboard.writeText(JSON.stringify(histLaps.slice(0,2),null,2))} className="underline">copy sample</button></div>}
+          {histLaps && (
+            <div className="panel rounded-lg p-3">
+              <div className="text-[11px] font-mono tracking-widest text-zinc-500">FastF1 HISTORICAL LAPS • {hist.gp} {hist.session} {hist.year}</div>
+              <div className="mt-1 text-[11px] font-mono text-zinc-500">
+                {Array.isArray(histLaps) && histLaps.length ? `${histLaps.length} laps via FastF1 cache (normalized)` : (histLaps as any).length===0 ? "No laps — try another GP/session or run pip install fastf1 + backend" : "Loading…"}
+                {Array.isArray(histLaps) && histLaps.length>0 && (
+                  <span> • Fastest {(histLaps as any[]).filter((l:any)=>l.lap_time).sort((a:any,b:any)=>a.lap_time-b.lap_time)[0]?.lap_time?.toFixed(3)}s • <button onClick={()=>navigator.clipboard.writeText(JSON.stringify((histLaps as any[]).slice(0,2),null,2))} className="underline hover:text-zinc-300">copy 2</button> • <button onClick={()=>{
+                    const rows = histLaps as any[]
+                    if(!rows.length) return
+                    const csv = "driver,lap,time\n" + rows.map((l:any)=> l.driver_number + "," + l.lap_number + "," + l.lap_time).join("\n")
+                    const blob=new Blob([csv],{type:"text/csv"})
+                    const url=URL.createObjectURL(blob)
+                    const a=document.createElement("a")
+                    a.href=url
+                    a.download= hist.gp + "-" + hist.session + "-" + hist.year + ".csv"
+                    a.click()
+                  }} className="underline hover:text-zinc-300">CSV</button></span>
+                )}
+              </div>
+              {Array.isArray(histLaps) && histLaps.length>0 && (
+                <div className="mt-2 max-h-40 overflow-auto text-[11px] font-mono">
+                  <div className="grid grid-cols-5 gap-2 text-zinc-600 border-b border-white/5 pb-1 sticky top-0 bg-[#141417]"><span>Driver</span><span>Lap</span><span>Time</span><span>Sectors</span><span>Tyre</span></div>
+                  {histLaps.slice(0,30).map((l:any,i:number)=>(
+                    <div key={i} className="grid grid-cols-5 gap-2 py-0.5 border-b border-white/[0.03] text-zinc-400"><span>{l.driver_number}</span><span>{l.lap_number}</span><span>{l.lap_time?`${Math.floor(l.lap_time/60)}:${(l.lap_time%60).toFixed(3).padStart(6,"0")}`:"—"}</span><span>{[l.sector_1,l.sector_2,l.sector_3].filter(Boolean).map((s:any)=>s.toFixed(2)).join(" / ")||"—"}</span><span>{l.compound||"—"} {l.tyre_age!=null?`·${l.tyre_age}`:""}</span></div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

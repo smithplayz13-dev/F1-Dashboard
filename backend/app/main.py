@@ -84,7 +84,6 @@ async def session_race_control(session_key: int):
 @app.get("/api/sessions/{session_key}/normalized", response_model=SessionData)
 async def session_normalized(session_key: int):
     try:
-        import datetime
         drivers, laps, positions, intervals, stints, rc, weather = await asyncio.gather(
             openf1.get_drivers(session_key),
             openf1.get_laps(session_key),
@@ -94,7 +93,7 @@ async def session_normalized(session_key: int):
             openf1.get_race_control(session_key),
             openf1.get_weather(session_key),
         )
-        # map to normalized quickly (reuse openf1 raw for frontend)
+        has_chequered = any((r.get("flag")=="CHEQUERED") or ("chequered" in r.get("message","").lower()) for r in rc)
         return {
             "session": None,
             "drivers": drivers,
@@ -105,7 +104,7 @@ async def session_normalized(session_key: int):
             "race_control": rc,
             "weather": weather[-1] if weather else None,
             "source": "openf1",
-            "is_live": False
+            "is_live": not has_chequered and bool(laps),
         }
     except Exception as e:
         raise HTTPException(500, str(e))

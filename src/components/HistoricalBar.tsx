@@ -19,7 +19,7 @@ export default function HistoricalBar({ year, gp, session, onChange }: {
       {error && <span className="text-xs font-mono text-red-400">{error} — need FastF1 + pip install fastf1</span>}
       {loading && <span className="text-xs font-mono text-zinc-500">Loading {year} schedule…</span>}
       <select value={year} onChange={e=>onChange({year:Number(e.target.value),gp,session})} className="bg-[#0a0a0b] border border-white/10 rounded px-2 py-1.5 text-xs font-mono text-zinc-300">
-        {[2024,2023,2022,2021].map(y=> <option key={y} value={y}>{y}</option>)}
+        {[2026,2025,2024,2023,2022].map(y=> <option key={y} value={y}>{y}</option>)}
       </select>
       <select value={gp} onChange={e=>onChange({year,gp:e.target.value,session})} className="bg-[#0a0a0b] border border-white/10 rounded px-2 py-1.5 text-xs font-mono text-zinc-300 min-w-[180px]">
         {schedule.map(s=> <option key={s.event_name} value={s.event_name}>{s.event_name} — {s.location}</option>)}
