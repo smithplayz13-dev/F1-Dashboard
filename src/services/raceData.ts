@@ -90,11 +90,12 @@ export function buildTimingRows(data: {
   const rows: TimingRowData[] = data.drivers.map(d => {
     const pos = posMap.get(d.driverNumber)
     const iv = intervalMap.get(d.driverNumber)
-    const laps = (lapsByDriver.get(d.driverNumber) ?? []).filter(l=>l.lapDuration && l.lapDuration>0).sort((a,b)=>a.lapNumber-b.lapNumber)
+    const laps = (lapsByDriver.get(d.driverNumber) ?? []).filter(l=>l.lapDuration != null && l.lapDuration>0).sort((a,b)=>a.lapNumber-b.lapNumber)
     const lastLap = laps[laps.length-1] ?? null
     const bestLap = laps.length ? [...laps].sort((a,b)=>(a.lapDuration??999)-(b.lapDuration??999))[0] : null
     const driverStints = data.stints.filter(s=>s.driverNumber===d.driverNumber).sort((a,b)=>a.stintNumber-b.stintNumber)
     const latestStint = driverStints[driverStints.length-1]
+    // tyre age: prefer interval/lap count derived from global current lap would be more accurate, but fallback to per-driver lap count
     const currentLapCount = laps.length
     const tyreAge = latestStint ? (latestStint.tyreAgeAtStart ?? 0) + Math.max(0, currentLapCount - latestStint.lapStart + 1) : null
 
@@ -131,9 +132,16 @@ export async function fetchSessionData(sessionKey?: number, useDemo=false): Prom
   try {
     let session: Session | null = null
     if (sessionKey) {
+      // fetch all sessions (no year filter) to guarantee we find any year
       const sessions = await openf1.getSessions()
       const found = sessions.find(s=>s.session_key===sessionKey)
       if (found) session = mapSession(found)
+      else {
+        // fallback: try range
+        const range = await openf1.getSessionsRange([2026,2025,2024,2023])
+        const f2 = range.find(s=>s.session_key===sessionKey)
+        if (f2) session = mapSession(f2)
+      }
     } else {
       const latest = await openf1.getLatestSession()
       if (latest) session = mapSession(latest)
@@ -159,25 +167,30 @@ export async function fetchSessionData(sessionKey?: number, useDemo=false): Prom
     const intervals: Interval[] = (intervalsRaw as any[]).map((iv:any)=>({ driverNumber:iv.driver_number, gapToLeader:iv.gap_to_leader, interval:iv.interval, date:iv.date }))
     const stints: Stint[] = (stintsRaw as any[]).map(mapStint)
     const raceControl: RaceControlMessage[] = (rcRaw as any[]).map((r:any)=>({...r, driverNumber: r.driver_number ?? null, lapNumber: r.lap_number ?? null}))
-    const weather: Weather | null = (weatherRaw as any[]).length ? {
-      airTemperature: weatherRaw[weatherRaw.length-1].air_temperature,
-      trackTemperature: weatherRaw[weatherRaw.length-1].track_temperature,
-      humidity: weatherRaw[weatherRaw.length-1].humidity,
-      pressure: weatherRaw[weatherRaw.length-1].pressure,
-      rainfall: weatherRaw[weatherRaw.length-1].rainfall,
-      windSpeed: weatherRaw[weatherRaw.length-1].wind_speed,
-      windDirection: weatherRaw[weatherRaw.length-1].wind_direction,
-      date: weatherRaw[weatherRaw.length-1].date,
-    } : null
+    // weather: pick latest by date, not array order
+    let weather: Weather | null = null
+    if ((weatherRaw as any[]).length) {
+      const sorted = [...weatherRaw as any[]].sort((a,b)=>+new Date(a.date)-+new Date(b.date))
+      const w = sorted[sorted.length-1]
+      weather = {
+        airTemperature: w.air_temperature,
+        trackTemperature: w.track_temperature,
+        humidity: w.humidity,
+        pressure: w.pressure,
+        rainfall: w.rainfall,
+        windSpeed: w.wind_speed,
+        windDirection: w.wind_direction,
+        date: w.date,
+      }
+    }
 
-    // live detection: session end in future and race control not chequered? simple heuristic: dateEnd > now => live
     const now = Date.now()
     const end = new Date(session.dateEnd).getTime()
     const start = new Date(session.dateStart).getTime()
-    const isLive = now >= start && now <= end + 2*60*60*1000 // 2h grace
-    const status: SessionData["status"] = isLive ? "live" : (now > end ? "ended" : "loading")
+    const hasChequered = raceControl.some(r=> (r.flag==="CHEQUERED") || r.message.toLowerCase().includes("chequered"))
+    const isLive = !hasChequered && now >= start && now <= end + 2*60*60*1000
+    const status: SessionData["status"] = isLive ? "live" : (now > end || hasChequered ? "ended" : "loading")
 
-    // if openf1 returned very sparse data (e.g. no positions/laps) fallback to demo but marked as offline? we still return sparse
     return {
       session, drivers, laps, positions, intervals, stints, raceControl, weather,
       status, lastUpdated: new Date().toISOString(), dataSource: "openf1", isLive
@@ -218,9 +231,16 @@ function demoSessionData(): SessionData {
   }
 }
 
-export async function listSessions(year=2025): Promise<Session[]> {
+export async function listSessions(year?: number): Promise<Session[]> {
   try {
-    const s = await openf1.getSessions(year)
+    const s = year ? await openf1.getSessions(year) : await openf1.getSessions()
+    return s.map(mapSession).sort((a,b)=>+new Date(b.dateStart)-+new Date(a.dateStart))
+  } catch { return [] }
+}
+
+export async function listSessionsRange(years: number[]): Promise<Session[]> {
+  try {
+    const s = await openf1.getSessionsRange(years)
     return s.map(mapSession).sort((a,b)=>+new Date(b.dateStart)-+new Date(a.dateStart))
   } catch { return [] }
 }

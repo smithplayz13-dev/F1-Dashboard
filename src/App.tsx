@@ -14,16 +14,19 @@ import { buildTimingRows } from "./services/raceData"
 import { formatLapTime } from "./utils/format"
 
 export default function App() {
-  const { sessionData, sessions, loading, error, selectedSessionKey, setSelectedSessionKey, load, dataSourceMode, setDataSourceMode } = useRaceData()
+  const { sessionData, sessions, loading, error, selectedSessionKey, setSelectedSessionKey, selectedYear, setSelectedYear, load, dataSourceMode, setDataSourceMode } = useRaceData()
   const [selectedDriver, setSelectedDriver] = useState<number | null>(null)
   const [compareDriver, setCompareDriver] = useState<number | null>(null)
+  const [selectedLapNumber, setSelectedLapNumber] = useState<number | null>(null)
   const [view, setView] = useState<ViewTab>("TIMING")
   const [broadcast, setBroadcast] = useState(false)
-  const [totalLaps] = useState(57)
 
   // keyboard shortcut F for broadcast
   useEffect(()=>{
-    const h = (e: KeyboardEvent)=> { if (e.key.toLowerCase()==="f") setBroadcast(v=>!v) }
+    const h = (e: KeyboardEvent)=> {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
+      if (e.key.toLowerCase()==="f") setBroadcast(v=>!v)
+    }
     window.addEventListener("keydown", h); return ()=>window.removeEventListener("keydown",h)
   }, [])
 
@@ -33,17 +36,45 @@ export default function App() {
   }, [sessionData])
 
   const currentLap = useMemo(()=>{
-    if (!timingRows.length) return 42
-    const max = Math.max(...timingRows.map(r=> r.lastLap?.lapNumber ?? 0))
-    return max || 42
-  }, [timingRows])
+    if (!timingRows.length) return 1
+    const max = Math.max(...timingRows.map(r=> r.lastLap?.lapNumber ?? 0), ... (sessionData?.laps.map(l=>l.lapNumber) ?? [0]))
+    return max || 1
+  }, [timingRows, sessionData])
+
+  const totalLaps = useMemo(()=>{
+    if (!sessionData?.laps.length) return 57
+    const max = Math.max(...sessionData.laps.map(l=>l.lapNumber))
+    // if race ended, max is actual race length; if live, use max or 57
+    return Math.max(max, 57)
+  }, [sessionData])
 
   const selectedRow = timingRows.find(r=>r.driver.driverNumber===selectedDriver) ?? null
   const compareRow = timingRows.find(r=>r.driver.driverNumber===compareDriver) ?? null
   const fastest = timingRows.length ? [...timingRows].filter(r=>r.bestLap?.lapDuration).sort((a,b)=>(a.bestLap!.lapDuration!)-(b.bestLap!.lapDuration!))[0] : null
+  const sessionFastest = useMemo(()=>{
+    const valid = (sessionData?.laps ?? []).filter(l=>l.lapDuration && l.lapDuration>0)
+    if (!valid.length) return null
+    return valid.sort((a,b)=>(a.lapDuration! - b.lapDuration!))[0]
+  }, [sessionData])
 
   // auto-select first driver if none
   useEffect(()=>{ if (!selectedDriver && timingRows.length) setSelectedDriver(timingRows[0].driver.driverNumber) }, [timingRows, selectedDriver])
+  // auto-select latest lap when driver changes
+  useEffect(()=>{
+    if (!sessionData || selectedDriver==null) return
+    const laps = sessionData.laps.filter(l=>l.driverNumber===selectedDriver && l.lapDuration && l.lapDuration>0).sort((a,b)=>a.lapNumber-b.lapNumber)
+    if (laps.length) setSelectedLapNumber(laps[laps.length-1].lapNumber)
+  }, [selectedDriver, sessionData])
+
+  const lapsForDriver = useMemo(()=>{
+    if (!sessionData || selectedDriver==null) return []
+    return sessionData.laps.filter(l=>l.driverNumber===selectedDriver).sort((a,b)=>a.lapNumber-b.lapNumber)
+  }, [sessionData, selectedDriver])
+
+  const currentLapData = useMemo(()=>{
+    if (!selectedLapNumber) return selectedRow?.lastLap ?? null
+    return lapsForDriver.find(l=>l.lapNumber===selectedLapNumber) ?? selectedRow?.lastLap ?? null
+  }, [selectedLapNumber, lapsForDriver, selectedRow])
 
   if (loading && !sessionData) {
     return (
@@ -53,7 +84,7 @@ export default function App() {
           <div className="mt-4 h-2 rounded-full bg-white/10 overflow-hidden">
             <div className="h-full w-2/3 bg-[#e10600] animate-pulse" />
           </div>
-          <div className="mt-3 text-xs font-mono text-zinc-600">OpenF1 • Ergast fallback • Polling 5s</div>
+          <div className="mt-3 text-xs font-mono text-zinc-600">OpenF1 • 2023→2026 • Polling 5s</div>
         </div>
       </div>
     )
@@ -83,13 +114,14 @@ export default function App() {
         sessions={sessions}
         selectedKey={selectedSessionKey}
         onSelectSession={(k)=>{ setSelectedSessionKey(k); load(k) }}
+        selectedYear={selectedYear}
+        onSelectYear={setSelectedYear}
         dataSourceMode={dataSourceMode}
         setDataSourceMode={setDataSourceMode}
         onBroadcast={()=>setBroadcast(v=>!v)}
         isBroadcast={broadcast}
       />
 
-      {/* secondary bar */}
       <div className="px-4 lg:px-6 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-[#0a0a0b]/50">
         <RaceControls active={view} onChange={setView} />
         <div className="flex items-center gap-3 text-[11px] font-mono">
@@ -103,35 +135,35 @@ export default function App() {
       <main className={`px-4 lg:px-6 py-4 lg:py-6 max-w-[1920px] mx-auto ${broadcast ? "max-w-none" : ""}`}>
         {view==="TIMING" && (
           <div className="grid grid-cols-12 gap-4 lg:gap-6">
-            {/* Timing tower — majority */}
             <div className="col-span-12 lg:col-span-8 xl:col-span-8">
               <TimingTower rows={timingRows} selected={selectedDriver} onSelect={(n)=>{
                 if (compareDriver!=null) {
-                  // if in compare mode, set second
                   if (n===compareDriver) setCompareDriver(null)
                   else if (n===selectedDriver) {} else setCompareDriver(n)
                 } else setSelectedDriver(n)
               }} />
             </div>
 
-            {/* Right column */}
             <div className="col-span-12 lg:col-span-4 xl:col-span-4 space-y-4">
               <TrackStatus weather={sessionData?.weather ?? null} raceControl={sessionData?.raceControl ?? []} lap={currentLap} totalLaps={totalLaps} />
               {selectedRow && (
                 <LapDelta
                   driverAbbr={selectedRow.driver.abbreviation}
-                  current={selectedRow.lastLap}
+                  laps={lapsForDriver}
+                  current={currentLapData}
                   best={selectedRow.bestLap}
-                  sectorDeltas={selectedRow.lastLap && selectedRow.bestLap ? [
-                    Number(((selectedRow.lastLap.durationSector1 ?? 0) - (selectedRow.bestLap.durationSector1 ?? 0)).toFixed(3)),
-                    Number(((selectedRow.lastLap.durationSector2 ?? 0) - (selectedRow.bestLap.durationSector2 ?? 0)).toFixed(3)),
-                    Number(((selectedRow.lastLap.durationSector3 ?? 0) - (selectedRow.bestLap.durationSector3 ?? 0)).toFixed(3)),
+                  sessionBest={sessionFastest}
+                  selectedLapNumber={selectedLapNumber}
+                  onSelectLap={setSelectedLapNumber}
+                  sectorDeltas={currentLapData && selectedRow.bestLap ? [
+                    Number(((currentLapData.durationSector1 ?? 0) - (selectedRow.bestLap.durationSector1 ?? 0)).toFixed(3)),
+                    Number(((currentLapData.durationSector2 ?? 0) - (selectedRow.bestLap.durationSector2 ?? 0)).toFixed(3)),
+                    Number(((currentLapData.durationSector3 ?? 0) - (selectedRow.bestLap.durationSector3 ?? 0)).toFixed(3)),
                   ] : undefined}
                 />
               )}
             </div>
 
-            {/* bottom telemetry + strategy */}
             <div className="col-span-12 grid grid-cols-12 gap-4 lg:gap-6">
               <div className="col-span-12 lg:col-span-7">
                 <LapGraph
@@ -139,6 +171,8 @@ export default function App() {
                   compareLaps={compareDriver ? sessionData?.laps.filter(l=>l.driverNumber===compareDriver) : undefined}
                   driverAbbr={selectedRow?.driver.abbreviation ?? "—"}
                   compareAbbr={compareRow?.driver.abbreviation}
+                  selectedLap={selectedLapNumber}
+                  onSelectLap={setSelectedLapNumber}
                 />
               </div>
               <div className="col-span-12 lg:col-span-5">
@@ -146,7 +180,6 @@ export default function App() {
                   <Comparison a={selectedRow} b={compareRow} onClose={()=>setCompareDriver(null)} />
                 ) : (
                   <DriverDetail row={selectedRow} onClose={()=>setSelectedDriver(timingRows[0]?.driver.driverNumber ?? null)} onCompare={()=>{
-                    // pick next driver as compare candidate
                     const other = timingRows.find(r=>r.driver.driverNumber!==selectedDriver)
                     if (other) setCompareDriver(other.driver.driverNumber)
                   }} />
@@ -163,13 +196,13 @@ export default function App() {
         {view==="TELEMETRY" && (
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12 lg:col-span-8">
-              <LapGraph laps={sessionData?.laps.filter(l=>l.driverNumber===selectedDriver) ?? []} driverAbbr={selectedRow?.driver.abbreviation ?? "—"} />
+              <LapGraph laps={sessionData?.laps.filter(l=>l.driverNumber===selectedDriver) ?? []} driverAbbr={selectedRow?.driver.abbreviation ?? "—"} selectedLap={selectedLapNumber} onSelectLap={setSelectedLapNumber} />
             </div>
             <div className="col-span-12 lg:col-span-4">
-              <DriverDetail row={selectedRow} onClose={()=>{}} />
+              <DriverDetail row={selectedRow ? {...selectedRow, lastLap: currentLapData, bestLap: selectedRow.bestLap } : null} onClose={()=>{}} />
               <div className="panel rounded-lg p-4 mt-4">
                 <div className="text-xs font-mono tracking-widest text-zinc-500">TELEMETRY STREAM</div>
-                <div className="text-xs font-mono text-zinc-600 mt-2">OpenF1 car_data (speed/rpm/gear/throttle/brake/drs) polled separately. Select driver then expand for live trace. Gracefully hidden when unavailable — currently showing cached speed only.</div>
+                <div className="text-xs font-mono text-zinc-600 mt-2">Browse laps via graph or delta picker. Older laps are accessible via brush/list. OpenF1 car_data polled separately when live.</div>
               </div>
             </div>
           </div>
@@ -180,7 +213,7 @@ export default function App() {
             <TireStrategy drivers={sessionData?.drivers ?? []} stints={sessionData?.stints ?? []} totalLaps={totalLaps} onSelectDriver={setSelectedDriver} selectedDriver={selectedDriver} />
             <div className="panel rounded-lg p-4">
               <div className="text-xs font-mono tracking-widest text-zinc-500">PIT WINDOW</div>
-              <div className="mt-2 text-sm font-mono text-zinc-300">Strategy view shows stint boundaries and compounds. Click any stint for details. Pit detection via lap_duration spikes and is_pit_out_lap flag from OpenF1.</div>
+              <div className="mt-2 text-sm font-mono text-zinc-300">Strategy view shows stint boundaries and compounds. Click any stint for details. Pit detection via lap_duration spikes and is_pit_out_lap flag.</div>
             </div>
           </div>
         )}

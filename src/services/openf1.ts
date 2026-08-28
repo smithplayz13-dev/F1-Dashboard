@@ -58,15 +58,28 @@ export interface OpenF1CarData { driver_number:number; speed:number|null; rpm:nu
 export const openf1 = {
   getSessions: (year?: number) =>
     fetchJSON<OpenF1Session[]>(`${OPENF1_BASE}/sessions${year?`?year=${year}`:""}`),
+  getSessionsRange: async (years: number[]): Promise<OpenF1Session[]> => {
+    const results = await Promise.all(years.map(y => fetchJSON<OpenF1Session[]>(`${OPENF1_BASE}/sessions?year=${y}`).catch(()=>[] as OpenF1Session[])))
+    return results.flat()
+  },
   getLatestSession: async (): Promise<OpenF1Session | null> => {
-    const s = await fetchJSON<OpenF1Session[]>(`${OPENF1_BASE}/sessions?year=2025`)
-    if (!s.length) {
-      const all = await fetchJSON<OpenF1Session[]>(`${OPENF1_BASE}/sessions`)
-      return all.sort((a,b)=>+new Date(b.date_start)-+new Date(a.date_start))[0] ?? null
+    const currentYear = new Date().getFullYear()
+    // try current year first, then walk backwards 2026 -> 2023
+    const tryYears = [currentYear, currentYear-1, currentYear-2, currentYear-3]
+    for (const y of tryYears) {
+      try {
+        const s = await fetchJSON<OpenF1Session[]>(`${OPENF1_BASE}/sessions?year=${y}`)
+        if (s.length) return s.sort((a,b)=>+new Date(b.date_start)-+new Date(a.date_start))[0]
+      } catch { /* continue */ }
     }
-    return s.sort((a,b)=>+new Date(b.date_start)-+new Date(a.date_start))[0]
+    const all = await fetchJSON<OpenF1Session[]>(`${OPENF1_BASE}/sessions`)
+    return all.sort((a,b)=>+new Date(b.date_start)-+new Date(a.date_start))[0] ?? null
   },
   getMeetings: (year?:number) => fetchJSON<OpenF1Meeting[]>(`${OPENF1_BASE}/meetings${year?`?year=${year}`:""}`),
+  getMeetingsRange: async (years:number[]) => {
+    const r = await Promise.all(years.map(y=> fetchJSON<OpenF1Meeting[]>(`${OPENF1_BASE}/meetings?year=${y}`).catch(()=>[] as OpenF1Meeting[])))
+    return r.flat()
+  },
   getDrivers: (sessionKey:number) => fetchJSON<OpenF1Driver[]>(`${OPENF1_BASE}/drivers?session_key=${sessionKey}`),
   getLaps: (sessionKey:number) => fetchJSON<OpenF1Lap[]>(`${OPENF1_BASE}/laps?session_key=${sessionKey}`),
   getPositions: (sessionKey:number) => fetchJSON<OpenF1Position[]>(`${OPENF1_BASE}/position?session_key=${sessionKey}`),
