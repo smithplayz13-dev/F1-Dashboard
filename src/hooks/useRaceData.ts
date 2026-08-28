@@ -15,26 +15,33 @@ export function useRaceData(initialSessionKey?: number) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [selectedSessionKey, setSelectedSessionKey] = useState<number | undefined>(initialSessionKey)
   const prevPosRef = useRef<Map<number,number>>(new Map())
+  const abortRef = useRef<AbortController | null>(null)
 
   const load = useCallback(async (sk?: number) => {
+    abortRef.current?.abort()
+    const ac = new AbortController()
+    abortRef.current = ac
     setLoading(true); setError(null)
     try {
       const useDemo = dataSourceMode==="demo"
       const data = await fetchSessionData(sk, useDemo)
+      if (ac.signal.aborted) return
       const nextTiming = buildTimingRows({ drivers:data.drivers, positions:data.positions, intervals:data.intervals, laps:data.laps, stints:data.stints, prevPositions: prevPosRef.current })
       const m = new Map<number,number>()
-      for (const r of nextTiming) m.set(r.driver.driverNumber, r.position)
+      for (const r of nextTiming) if (r.position!==99) m.set(r.driver.driverNumber, r.position)
       prevPosRef.current = m
       setSessionData(data)
       if (data.session && !sk) setSelectedSessionKey(data.session.sessionKey)
       if (data.session) setSelectedYear(data.session.year)
     } catch (e:any) {
+      if (e?.name==="AbortError") return
       setError(e.message ?? "Failed to load")
-    } finally { setLoading(false) }
+    } finally {
+      if (!ac.signal.aborted) setLoading(false)
+    }
   }, [dataSourceMode])
 
   const refreshSessions = useCallback(async (year?: number) => {
-    // if year specified, fetch that year only; else fetch range
     if (year) {
       const s = await listSessionsRange([year])
       setSessions(s)
@@ -44,19 +51,19 @@ export function useRaceData(initialSessionKey?: number) {
     }
   }, [])
 
-  // initial list + load
+  // initial list + load — single effect to avoid double fetch
+  const initializedRef = useRef(false)
   useEffect(()=> {
+    if (initializedRef.current) return
+    initializedRef.current = true
     refreshSessions()
     load(selectedSessionKey)
   }, []) // eslint-disable-line
 
-  // when datasource mode changes, reload
-  useEffect(()=> { load(selectedSessionKey) }, [dataSourceMode]) // eslint-disable-line
-
-  // when year changes, refresh session list (but don't auto-load unless no session)
+  // when year changes, refresh session list
   useEffect(()=> { refreshSessions(selectedYear) }, [selectedYear, refreshSessions])
 
-  // polling — stable interval, does not depend on sessionData object identity
+  // polling — stable interval, abort-safe
   const sessionKeyRef = useRef(selectedSessionKey)
   useEffect(()=> { sessionKeyRef.current = selectedSessionKey }, [selectedSessionKey])
   const isLiveRef = useRef(false)
@@ -69,7 +76,7 @@ export function useRaceData(initialSessionKey?: number) {
       fetchSessionData(sessionKeyRef.current, false).then(data=>{
         const nextTiming = buildTimingRows({ drivers:data.drivers, positions:data.positions, intervals:data.intervals, laps:data.laps, stints:data.stints, prevPositions: prevPosRef.current })
         const m = new Map<number,number>()
-        for (const r of nextTiming) m.set(r.driver.driverNumber, r.position)
+        for (const r of nextTiming) if (r.position!==99) m.set(r.driver.driverNumber, r.position)
         prevPosRef.current = m
         setSessionData(data)
       }).catch(()=>{})
@@ -77,7 +84,6 @@ export function useRaceData(initialSessionKey?: number) {
     return ()=> clearInterval(id)
   }, [dataSourceMode])
 
-  // for header controls — fetch available meetings
   const [meetings, setMeetings] = useState<any[]>([])
   useEffect(()=> { openf1.getMeetingsRange(YEARS).then(setMeetings).catch(()=>{}) }, [])
 

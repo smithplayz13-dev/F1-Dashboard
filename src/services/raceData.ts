@@ -66,6 +66,7 @@ export function buildTimingRows(data: {
   stints: Stint[]
   carData?: { driverNumber:number; speed:number|null; drs:number }[]
   prevPositions?: Map<number, number>
+  currentLap?: number
 }): TimingRowData[] {
   // latest position per driver
   const posMap = new Map<number, PositionEntry>()
@@ -87,21 +88,33 @@ export function buildTimingRows(data: {
   const drsMap = new Map<number, number>()
   for (const c of data.carData ?? []) { speedMap.set(c.driverNumber, c.speed); drsMap.set(c.driverNumber, c.drs) }
 
+  // global current lap for tyre age if provided, else fallback to per-driver max
+  const globalLap = data.currentLap ?? (data.laps.length ? Math.max(...data.laps.map(l=>l.lapNumber)) : 0)
+
   const rows: TimingRowData[] = data.drivers.map(d => {
     const pos = posMap.get(d.driverNumber)
     const iv = intervalMap.get(d.driverNumber)
-    const laps = (lapsByDriver.get(d.driverNumber) ?? []).filter(l=>l.lapDuration != null && l.lapDuration>0).sort((a,b)=>a.lapNumber-b.lapNumber)
-    const lastLap = laps[laps.length-1] ?? null
-    const bestLap = laps.length ? [...laps].sort((a,b)=>(a.lapDuration??999)-(b.lapDuration??999))[0] : null
+    const laps = (lapsByDriver.get(d.driverNumber) ?? []).filter(l=>l.lapDuration != null && l.lapDuration>0 && !l.isPitOutLap).sort((a,b)=>a.lapNumber-b.lapNumber)
+    // keep lastLap including pit? for display keep non-pit last, but store raw last for reference
+    const allLaps = (lapsByDriver.get(d.driverNumber) ?? []).filter(l=>l.lapDuration != null && l.lapDuration>0).sort((a,b)=>a.lapNumber-b.lapNumber)
+    const lastLap = allLaps[allLaps.length-1] ?? null
+    const bestLap = laps.length ? [...laps].sort((a,b)=>(a.lapDuration??999)-(b.lapDuration??999))[0] : (allLaps.length ? [...allLaps].sort((a,b)=>(a.lapDuration??999)-(b.lapDuration??999))[0] : null)
     const driverStints = data.stints.filter(s=>s.driverNumber===d.driverNumber).sort((a,b)=>a.stintNumber-b.stintNumber)
     const latestStint = driverStints[driverStints.length-1]
-    // tyre age: prefer interval/lap count derived from global current lap would be more accurate, but fallback to per-driver lap count
-    const currentLapCount = laps.length
-    const tyreAge = latestStint ? (latestStint.tyreAgeAtStart ?? 0) + Math.max(0, currentLapCount - latestStint.lapStart + 1) : null
+    // tyre age: use global lap if available (- stint start +1 + ageAtStart), fallback to driver lap count
+    let tyreAge: number | null = null
+    if (latestStint) {
+      const base = latestStint.tyreAgeAtStart ?? 0
+      const lapsInStint = Math.max(0, (globalLap || allLaps.length) - latestStint.lapStart + 1)
+      // cap at stint length if lapEnd known
+      const cap = latestStint.lapEnd ? latestStint.lapEnd - latestStint.lapStart + 1 : Infinity
+      tyreAge = base + Math.min(lapsInStint, cap)
+      if (!Number.isFinite(tyreAge) || tyreAge < 0) tyreAge = null
+    }
 
     const prev = data.prevPositions?.get(d.driverNumber)
     const curPos = pos?.position ?? 99
-    const change = prev != null ? prev - curPos : 0
+    const change = prev != null && curPos !== 99 && prev !== 99 ? prev - curPos : 0
 
     return {
       driver: d,

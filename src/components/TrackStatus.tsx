@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import type { Weather, RaceControlMessage } from "../types"
 
 function flagStyle(flag?: string) {
@@ -9,7 +10,7 @@ function flagStyle(flag?: string) {
     default: return "bg-zinc-800 text-zinc-300"
   }
 }
-function statusLabel(rc: RaceControlMessage | undefined, fallback="GREEN FLAG") {
+function statusLabel(rc: RaceControlMessage | undefined, fallback="NO FLAG DATA") {
   if (!rc) return fallback
   if (rc.flag) return `${rc.flag} FLAG`
   if (rc.category) return rc.category.toUpperCase()
@@ -17,10 +18,17 @@ function statusLabel(rc: RaceControlMessage | undefined, fallback="GREEN FLAG") 
 }
 
 export default function TrackStatus({ weather, raceControl, lap, totalLaps }: { weather: Weather | null, raceControl: RaceControlMessage[], lap: number, totalLaps:number }) {
-  const latestFlag = [...raceControl].reverse().find(r=>r.flag) ?? raceControl[raceControl.length-1]
-  const flag = latestFlag?.flag ?? "GREEN"
-  const sc = raceControl.find(r=>r.message.toLowerCase().includes("safety car"))
-  const displayFlag = sc ? (sc.message.includes("VIRTUAL") ? "VIRTUAL SAFETY CAR" : "SAFETY CAR") : statusLabel(latestFlag)
+  const [nowStr, setNowStr] = useState(()=> new Date().toLocaleTimeString())
+  useEffect(()=>{
+    const id = setInterval(()=> setNowStr(new Date().toLocaleTimeString()), 1000)
+    return ()=> clearInterval(id)
+  }, [])
+
+  const sorted = [...raceControl].sort((a,b)=>+new Date(a.date)-+new Date(b.date))
+  const latestFlag = [...sorted].reverse().find(r=>r.flag) ?? sorted[sorted.length-1]
+  const flag = latestFlag?.flag ?? null
+  const latestSC = [...sorted].reverse().find(r=>r.message.toLowerCase().includes("safety car"))
+  const displayFlag = latestSC ? (latestSC.message.toLowerCase().includes("virtual") ? "VIRTUAL SAFETY CAR" : "SAFETY CAR") : statusLabel(latestFlag)
 
   return (
     <div className="panel rounded-lg p-3 space-y-3">
@@ -29,7 +37,7 @@ export default function TrackStatus({ weather, raceControl, lap, totalLaps }: { 
         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-500">RC {raceControl.length}</span>
       </div>
 
-      <div className={`rounded px-3 py-2 text-center font-display font-bold tracking-widest text-sm border ${flagStyle(flag)} ${flag==="YELLOW" || flag==="RED" ? "border-white/20" : "border-transparent"}`}>
+      <div className={`rounded px-3 py-2 text-center font-display font-bold tracking-widest text-sm border ${flagStyle(flag ?? undefined)} ${flag==="YELLOW" || flag==="RED" ? "border-white/20" : "border-transparent"}`}>
         {displayFlag}
       </div>
 
@@ -40,7 +48,7 @@ export default function TrackStatus({ weather, raceControl, lap, totalLaps }: { 
         </div>
         <div className="bg-black/30 rounded border border-white/5 p-2">
           <div className="text-[10px] font-mono tracking-widest text-zinc-500">TIME</div>
-          <div className="font-mono font-bold text-sm text-white">{new Date().toLocaleTimeString()}</div>
+          <div className="font-mono font-bold text-sm text-white">{nowStr}</div>
         </div>
       </div>
 
@@ -68,11 +76,12 @@ export default function TrackStatus({ weather, raceControl, lap, totalLaps }: { 
       )}
 
       <div className="space-y-1 max-h-20 overflow-auto">
-        {raceControl.slice(-3).map((r,i)=>(
-          <div key={i} className="text-[11px] font-mono leading-tight px-2 py-1 rounded bg-white/[0.04] border border-white/5 text-zinc-400 truncate">
+        {sorted.slice(-3).map((r,i)=>(
+          <div key={i} className="text-[11px] font-mono leading-tight px-2 py-1 rounded bg-white/[0.04] border border-white/5 text-zinc-400 truncate" title={r.message}>
             {r.message}
           </div>
         ))}
+        {!sorted.length && <div className="text-[11px] font-mono text-zinc-600">No race control messages</div>}
       </div>
     </div>
   )

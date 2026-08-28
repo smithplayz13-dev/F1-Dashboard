@@ -13,14 +13,16 @@ export const TEAM_COLORS: Record<string, string> = {
   "Visa Cash App RB": "#6692FF",
   "Kick Sauber": "#52E252",
   "Sauber": "#52E252",
-  "Haas F1 Team": "#FFFFFF",
+  "Haas F1 Team": "#B6BABD",
   "Haas": "#B6BABD",
 }
 
 export function teamColor(teamName: string): string {
+  if (!teamName) return "#6b7280"
   if (TEAM_COLORS[teamName]) return TEAM_COLORS[teamName]
-  // fuzzy match
-  const k = Object.keys(TEAM_COLORS).find(k => teamName.toLowerCase().includes(k.toLowerCase().split(" ")[0]))
+  // fuzzy match — prefer longest key first to avoid "Haas" vs "Haas F1 Team" collision
+  const sorted = Object.keys(TEAM_COLORS).sort((a,b)=>b.length-a.length)
+  const k = sorted.find(k => teamName.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(teamName.toLowerCase().split(" ")[0]))
   return k ? TEAM_COLORS[k] : "#6b7280"
 }
 

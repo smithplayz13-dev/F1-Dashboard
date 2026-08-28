@@ -7,13 +7,17 @@ export default function TireStrategy({ drivers, stints, totalLaps=57, onSelectDr
 }) {
   const [selectedStint, setSelectedStint] = useState<Stint | null>(null)
 
-  // pick top 6 rows to avoid clutter, selected always visible
-  const visibleDrivers = drivers.slice(0, 8)
-  // ensure selected in list
-  if (selectedDriver && !visibleDrivers.find(d=>d.driverNumber===selectedDriver)) {
-    const sd = drivers.find(d=>d.driverNumber===selectedDriver)
-    if (sd) visibleDrivers[visibleDrivers.length-1]=sd
-  }
+  const visibleDrivers = (()=> {
+    const base = drivers.slice(0, 8)
+    if (selectedDriver && !base.find(d=>d.driverNumber===selectedDriver)) {
+      const sd = drivers.find(d=>d.driverNumber===selectedDriver)
+      if (sd) {
+        if (base.length < 8) base.push(sd)
+        else base[base.length-1]=sd
+      }
+    }
+    return base
+  })()
 
   return (
     <div className="panel rounded-lg p-3">
@@ -29,12 +33,13 @@ export default function TireStrategy({ drivers, stints, totalLaps=57, onSelectDr
       </div>
 
       <div className="space-y-2">
-        {/* ruler */}
         <div className="flex text-[10px] font-mono text-zinc-600 ml-[56px]">
           {[1, Math.floor(totalLaps/4), Math.floor(totalLaps/2), Math.floor(totalLaps*0.75), totalLaps].map(l=>(
             <span key={l} className="flex-1">{l}</span>
           ))}
         </div>
+
+        {!visibleDrivers.length && <div className="text-xs font-mono text-zinc-600 text-center py-4">No driver data</div>}
 
         {visibleDrivers.map(d=>{
           const ds = stints.filter(s=>s.driverNumber===d.driverNumber).sort((a,b)=>a.stintNumber-b.stintNumber)
@@ -45,8 +50,8 @@ export default function TireStrategy({ drivers, stints, totalLaps=57, onSelectDr
                 {ds.length ? ds.map(s=>{
                   const start = s.lapStart
                   const end = s.lapEnd ?? totalLaps
-                  const span = end - start + 1
-                  const pct = (span/totalLaps)*100
+                  const span = Math.max(1, end - start + 1)
+                  const pct = Math.min(100, (span/totalLaps)*100)
                   return (
                     <button
                       key={s.stintNumber}
@@ -62,7 +67,7 @@ export default function TireStrategy({ drivers, stints, totalLaps=57, onSelectDr
                   <span className="flex-1 flex items-center justify-center text-[10px] font-mono text-zinc-600">no stint data</span>
                 )}
               </div>
-              <span className="hidden lg:block w-8 text-right font-mono text-[10px] text-zinc-500">{ds.length} pit</span>
+              <span className="hidden lg:block w-8 text-right font-mono text-[10px] text-zinc-500">{ds.length} stint</span>
             </div>
           )
         })}
