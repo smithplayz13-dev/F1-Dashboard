@@ -10,8 +10,9 @@ import Comparison from "./components/Comparison"
 import RaceControls from "./components/RaceControls"
 import type { ViewTab } from "./components/RaceControls"
 import { useRaceData } from "./hooks/useRaceData"
-import { buildTimingRows } from "./services/raceData"
+import { buildTimingRows, buildTimingRowsAtLap } from "./services/raceData"
 import { formatLapTime } from "./utils/format"
+import ReplayBar from "./components/ReplayBar"
 
 export default function App() {
   const { sessionData, sessions, loading, error, selectedSessionKey, setSelectedSessionKey, selectedYear, setSelectedYear, load, dataSourceMode, setDataSourceMode } = useRaceData()
@@ -20,6 +21,9 @@ export default function App() {
   const [selectedLapNumber, setSelectedLapNumber] = useState<number | null>(null)
   const [view, setView] = useState<ViewTab>("TIMING")
   const [broadcast, setBroadcast] = useState(false)
+  const [replayLap, setReplayLap] = useState<number | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [replaySpeed, setReplaySpeed] = useState(1)
   const prevPosRef = useRef<Map<number,number>>(new Map())
 
   useEffect(()=>{
@@ -41,23 +45,37 @@ export default function App() {
     return Math.max(max, 57)
   }, [sessionData])
 
+  // replayLap is the lap we are viewing in replay mode; defaults to currentLap (live)
+  const effectiveReplayLap = replayLap ?? currentLap
+
   const timingRows = useMemo(()=>{
     if (!sessionData) return []
-    const rows = buildTimingRows({
-      drivers: sessionData.drivers,
-      positions: sessionData.positions,
-      intervals: sessionData.intervals,
-      laps: sessionData.laps,
-      stints: sessionData.stints,
-      prevPositions: prevPosRef.current,
-      currentLap,
-    })
-    // update prev map for next render (no setState)
+    // if replayLap is set and not at live, show historical snapshot
+    const useReplay = replayLap != null && replayLap !== currentLap && !sessionData.isLive
+    const rows = useReplay
+      ? buildTimingRowsAtLap({
+          drivers: sessionData.drivers,
+          positions: sessionData.positions,
+          intervals: sessionData.intervals,
+          laps: sessionData.laps,
+          stints: sessionData.stints,
+          prevPositions: prevPosRef.current,
+          replayLap: effectiveReplayLap,
+        })
+      : buildTimingRows({
+          drivers: sessionData.drivers,
+          positions: sessionData.positions,
+          intervals: sessionData.intervals,
+          laps: sessionData.laps,
+          stints: sessionData.stints,
+          prevPositions: prevPosRef.current,
+          currentLap,
+        })
     const m = new Map<number,number>()
     for (const r of rows) if (r.position!==99) m.set(r.driver.driverNumber, r.position)
     prevPosRef.current = m
     return rows
-  }, [sessionData, currentLap])
+  }, [sessionData, currentLap, replayLap, effectiveReplayLap])
 
   const selectedRow = timingRows.find(r=>r.driver.driverNumber===selectedDriver) ?? timingRows[0] ?? null
   const compareRow = timingRows.find(r=>r.driver.driverNumber===compareDriver) ?? null
@@ -87,6 +105,44 @@ export default function App() {
       setSelectedLapNumber(laps[laps.length-1].lapNumber)
     }
   }, [effectiveSelectedDriver, sessionData, selectedLapNumber])
+
+  // when session changes, reset replay to live
+  useEffect(()=>{
+    if (sessionData?.session) {
+      setReplayLap(null)
+      setIsPlaying(false)
+    }
+  }, [sessionData?.session?.sessionKey])
+
+  // sync selectedLapNumber with replayLap for unified lap-to-lap switching
+  useEffect(()=>{
+    if (selectedLapNumber != null && selectedLapNumber !== effectiveReplayLap && !sessionData?.isLive) {
+      setReplayLap(selectedLapNumber)
+    }
+  }, [selectedLapNumber, effectiveReplayLap, sessionData?.isLive])
+
+  // keyboard arrows for lap stepping
+  useEffect(()=>{
+    const h2 = (e: KeyboardEvent)=>{
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || (e.target as HTMLElement)?.isContentEditable) return
+      if (e.key==="ArrowLeft") setReplayLap(v=> Math.max(1, (v ?? currentLap)-1))
+      if (e.key==="ArrowRight") setReplayLap(v=> Math.min(totalLaps, (v ?? currentLap)+1))
+    }
+    window.addEventListener("keydown", h2); return ()=> window.removeEventListener("keydown",h2)
+  }, [currentLap, totalLaps])
+
+  // auto-play
+  useEffect(()=>{
+    if (!isPlaying) return
+    const id = setInterval(()=> {
+      setReplayLap(v=>{
+        const cur = v ?? currentLap
+        if (cur >= totalLaps) { setIsPlaying(false); return cur }
+        return cur+1
+      })
+    }, 1000 / replaySpeed)
+    return ()=> clearInterval(id)
+  }, [isPlaying, replaySpeed, currentLap, totalLaps])
 
   const lapsForDriver = useMemo(()=>{
     if (!sessionData || effectiveSelectedDriver==null) return []
@@ -152,6 +208,20 @@ export default function App() {
           {sessionData?.dataSource==="demo" && <span className="px-2 py-1 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold tracking-widest text-[10px]">DEMO MODE</span>}
           {sessionData?.status==="offline" && <span className="px-2 py-1 rounded bg-red-500/15 text-red-400 border border-red-500/30 font-bold tracking-widest text-[10px]">OFFLINE • DEMO FALLBACK</span>}
         </div>
+      </div>
+
+      {/* Replay bar — fully view old races lap-by-lap */}
+      <div className="px-4 lg:px-6 pt-3">
+        <ReplayBar
+          currentLap={currentLap}
+          totalLaps={totalLaps}
+          replayLap={effectiveReplayLap}
+          onScrub={(lap)=>{ setReplayLap(lap); setSelectedLapNumber(lap) }}
+          isPlaying={isPlaying}
+          onPlayPause={()=>setIsPlaying(v=>!v)}
+          speed={replaySpeed}
+          onSpeedChange={setReplaySpeed}
+        />
       </div>
 
       <main className={`px-4 lg:px-6 py-4 lg:py-6 max-w-[1920px] mx-auto ${broadcast ? "max-w-none" : ""}`}>

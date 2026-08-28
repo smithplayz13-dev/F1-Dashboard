@@ -36,6 +36,7 @@ export interface Lap {
   durationSector3?: number | null
   isPitOutLap?: boolean
   isPitInLap?: boolean
+  dateStart?: string
 }
 
 export interface PositionEntry {

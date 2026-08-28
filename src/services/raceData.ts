@@ -42,6 +42,7 @@ function mapLap(l: any): Lap {
     durationSector2: l.duration_sector_2,
     durationSector3: l.duration_sector_3,
     isPitOutLap: l.is_pit_out_lap,
+    dateStart: l.date_start,
   }
 }
 
@@ -136,6 +137,40 @@ export function buildTimingRows(data: {
   // sort by position, drivers without position at end
   rows.sort((a,b)=>a.position-b.position)
   return rows
+}
+
+export function buildTimingRowsAtLap(data: {
+  drivers: Driver[]
+  positions: PositionEntry[]
+  intervals: Interval[]
+  laps: Lap[]
+  stints: Stint[]
+  carData?: { driverNumber:number; speed:number|null; drs:number }[]
+  prevPositions?: Map<number, number>
+  replayLap: number
+}): TimingRowData[] {
+  // find cutoff date for replayLap = latest lap date_start at that lap
+  const lapsAtOrBefore = data.laps.filter(l=>l.lapNumber <= data.replayLap)
+  // if lap dates exist, use max date as cutoff for positions/intervals
+  const datedLaps = lapsAtOrBefore.filter(l=>l.dateStart)
+  let cutoffDate: string | null = null
+  if (datedLaps.length) {
+    cutoffDate = datedLaps.sort((a,b)=>+new Date(a.dateStart!)-+new Date(b.dateStart!))[datedLaps.length-1].dateStart!
+  }
+  const filteredPositions = cutoffDate ? data.positions.filter(p=> +new Date(p.date) <= +new Date(cutoffDate!)) : data.positions
+  const filteredIntervals = cutoffDate ? data.intervals.filter(i=> +new Date(i.date) <= +new Date(cutoffDate!)) : data.intervals
+  // if no dated laps (demo), fallback to lap-number filtering only — positions stay as final but laps are filtered
+  const filteredLaps = lapsAtOrBefore
+  return buildTimingRows({
+    drivers: data.drivers,
+    positions: filteredPositions.length ? filteredPositions : data.positions,
+    intervals: filteredIntervals.length ? filteredIntervals : data.intervals,
+    laps: filteredLaps,
+    stints: data.stints,
+    carData: data.carData,
+    prevPositions: data.prevPositions,
+    currentLap: data.replayLap,
+  })
 }
 
 export async function fetchSessionData(sessionKey?: number, useDemo=false): Promise<SessionData> {
