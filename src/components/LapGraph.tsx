@@ -5,7 +5,7 @@ import { formatLapTime } from "../utils/format"
 export default function LapGraph({ laps, compareLaps, driverAbbr, compareAbbr, onSelectLap, selectedLap }: {
   laps: Lap[], compareLaps?: Lap[], driverAbbr: string, compareAbbr?: string, onSelectLap?: (n:number)=>void, selectedLap?: number|null
 }) {
-  const data = laps.filter(l=>l.lapDuration != null && l.lapDuration<200).map(l=>({
+  const data = laps.filter(l=>l.lapDuration != null && l.lapDuration<200 && !l.isPitOutLap).map(l=>({
     lap: l.lapNumber,
     time: Number(l.lapDuration!.toFixed(3)),
     pit: !!l.isPitOutLap,

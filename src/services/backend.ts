@@ -4,9 +4,12 @@ const API_BASE = (import.meta.env.VITE_API_URL as string) || ""
 
 async function fetchJSON<T>(path: string, params?: Record<string,string|number>): Promise<T> {
   const url = API_BASE ? `${API_BASE}${path}` : path
-  const qs = params ? "?" + new URLSearchParams(params as any).toString() : ""
+  const qs = params ? "?" + new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]) as any).toString() : ""
   const res = await fetch(url + qs)
-  if (!res.ok) throw new Error(`${path} ${res.status}`)
+  if (!res.ok) {
+    const txt = await res.text().catch(()=> "")
+    throw new Error(`${path} ${res.status} ${txt.slice(0,120)}`)
+  }
   return res.json()
 }
 

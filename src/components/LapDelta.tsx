@@ -22,10 +22,10 @@ export default function LapDelta({
   onSelectLap?: (lapNumber: number) => void
   selectedLapNumber?: number | null
 }) {
-  const sorted = [...laps].filter(l=>l.lapDuration && l.lapDuration>0).sort((a,b)=>a.lapNumber-b.lapNumber)
+  const sorted = [...laps].filter(l=>l.lapDuration != null && l.lapDuration>0).sort((a,b)=>a.lapNumber-b.lapNumber)
   const hasLaps = sorted.length > 0
-  const delta = current?.lapDuration && best?.lapDuration ? current.lapDuration - best.lapDuration : null
-  const s = sectorDeltas ?? [0.082, -0.143, 0.021]
+  const delta = current?.lapDuration != null && best?.lapDuration != null ? current.lapDuration - best.lapDuration : null
+  const s = sectorDeltas ?? [0,0,0]
   const modes: Mode[] = ["Current","Previous","Best","Session Best"]
 
   // determine active mode label for styling — caller controls current vs previous via props

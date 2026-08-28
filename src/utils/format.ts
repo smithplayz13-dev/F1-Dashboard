@@ -1,14 +1,15 @@
 export function formatLapTime(seconds: number | null | undefined): string {
   if (seconds == null || !isFinite(seconds) || seconds <= 0) return "—"
   const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  // pad seconds to 2 digits before decimal + .3ms, not 00.xxx
-  const secInt = Math.floor(s)
-  const ms = Math.round((s - secInt) * 1000)
+  let s = seconds % 60
+  let secInt = Math.floor(s)
+  let ms = Math.round((s - secInt) * 1000)
+  if (ms === 1000) { ms = 0; secInt += 1; if (secInt === 60) { secInt = 0; s = 0 } }
+  // handle carry to minutes
+  let mm = m
+  if (secInt === 60) { secInt = 0; mm += 1 }
   const secStr = `${String(secInt).padStart(2,"0")}.${String(ms).padStart(3,"0")}`
-  // for sub-minute laps show 0:SS.mmm, for <10s still 0:09.123 (broadcast style)
-  // but avoid 00.500 for pit delta — keep m prefix
-  return `${m}:${secStr}`
+  return `${mm}:${secStr}`
 }
 
 export function formatGap(gap: string | null): string {

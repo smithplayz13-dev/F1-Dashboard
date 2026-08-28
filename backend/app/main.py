@@ -94,6 +94,8 @@ async def session_normalized(session_key: int):
             openf1.get_weather(session_key),
         )
         has_chequered = any((r.get("flag")=="CHEQUERED") or ("chequered" in r.get("message","").lower()) for r in rc)
+        # is_live heuristic mirrors frontend raceData: date window + no chequered
+        is_live = not has_chequered and bool(laps)
         return {
             "session": None,
             "drivers": drivers,
@@ -104,7 +106,7 @@ async def session_normalized(session_key: int):
             "race_control": rc,
             "weather": weather[-1] if weather else None,
             "source": "openf1",
-            "is_live": not has_chequered and bool(laps),
+            "is_live": is_live,
         }
     except Exception as e:
         raise HTTPException(500, str(e))
