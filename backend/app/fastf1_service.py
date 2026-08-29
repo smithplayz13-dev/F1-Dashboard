@@ -26,28 +26,49 @@ async def get_session_laps(year: int, gp: str, session: str = "R"):
     import asyncio
     def _load():
         try:
-            # Try by GP name, fallback to round lookup
+            import pandas as pd
+            import math
+            def safe_time(v):
+                try:
+                    if pd.isna(v): return None
+                    return float(v.total_seconds())
+                except: return None
+            def safe_int(v):
+                try:
+                    if pd.isna(v): return None
+                    return int(v)
+                except: return None
             ses = fastf1.get_session(year, gp, session)
             ses.load(telemetry=False)
             laps = ses.laps
-            # normalize
             out = []
             for _, row in laps.iterrows():
                 try:
+                    dn = str(row["DriverNumber"]).strip()
+                    lap_time = safe_time(row.get("LapTime"))
+                    s1 = safe_time(row.get("Sector1Time"))
+                    s2 = safe_time(row.get("Sector2Time"))
+                    s3 = safe_time(row.get("Sector3Time"))
+                    # filter out NaN lap_time
+                    if lap_time is not None and (math.isnan(lap_time) or lap_time <= 0):
+                        lap_time = None
                     out.append({
-                        "driver_number": int(str(row["DriverNumber"]).strip()) if str(row["DriverNumber"]).isdigit() else 0,
-                        "lap_number": int(row["LapNumber"]) if row["LapNumber"] else 0,
-                        "lap_time": float(row["LapTime"].total_seconds()) if row["LapTime"] else None,
-                        "sector_1": float(row["Sector1Time"].total_seconds()) if row["Sector1Time"] else None,
-                        "sector_2": float(row["Sector2Time"].total_seconds()) if row["Sector2Time"] else None,
-                        "sector_3": float(row["Sector3Time"].total_seconds()) if row["Sector3Time"] else None,
-                        "compound": str(row["Compound"]) if row["Compound"] else None,
-                        "tyre_age": int(row["TyreLife"]) if row["TyreLife"] else None,
-                        "is_pit_out_lap": bool(row["PitOutTime"]) if "PitOutTime" in row else False,
+                        "driver_number": int(dn) if dn.isdigit() else 0,
+                        "lap_number": safe_int(row.get("LapNumber")) or 0,
+                        "lap_time": lap_time,
+                        "sector_1": s1 if s1 is None or not math.isnan(s1) else None,
+                        "sector_2": s2 if s2 is None or not math.isnan(s2) else None,
+                        "sector_3": s3 if s3 is None or not math.isnan(s3) else None,
+                        "compound": str(row["Compound"]) if pd.notna(row.get("Compound")) and row.get("Compound") else None,
+                        "tyre_age": safe_int(row.get("TyreLife")),
+                        "is_pit_out_lap": bool(row.get("PitOutTime")) if pd.notna(row.get("PitOutTime")) else False,
                     })
-                except: pass
+                except Exception:
+                    pass
             return out
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return {"error": str(e)}
     out = await asyncio.to_thread(_load)
     if isinstance(out, list):
