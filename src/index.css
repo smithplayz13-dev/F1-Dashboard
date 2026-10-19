@@ -7,26 +7,127 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2a2a2f; border-radius: 3px; }
 
-body {
-  background: #070709;
-  color: #e5e7eb;
-  font-family: Inter, system-ui, -apple-system, sans-serif;
-  overflow-x: hidden;
+:root {
+  --carbon: #08080b;
+  --pit: #0e0e13;
+  --rosso: #e10600;
 }
 
-.mono { font-family: "IBM Plex Mono", monospace; }
+html { scroll-behavior: smooth; }
 
-/* subtle grid texture */
+body {
+  background: var(--carbon);
+  color: #f4f4f5;
+  font-family: Outfit, system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: "JetBrains Mono", monospace; }
+
+/* ambient carbon texture: Originkit pulse-grid idea, CSS-only fallback */
 .bg-grid {
   background-image:
-    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
   background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 30%, transparent 100%);
 }
 
-/* glass panel */
+.carbon-sheen {
+  background:
+    radial-gradient(1200px 500px at 15% -10%, rgba(225,6,0,0.14), transparent 60%),
+    radial-gradient(900px 420px at 90% 0%, rgba(96,165,250,0.08), transparent 60%),
+    radial-gradient(700px 500px at 50% 110%, rgba(225,6,0,0.05), transparent 60%);
+}
+
+/* glass panel — quiet, disciplined, one bold accent only */
 .panel {
-  background: linear-gradient(180deg, rgba(26,26,30,0.9) 0%, rgba(18,18,20,0.95) 100%);
-  border: 1px solid rgba(255,255,255,0.06);
-  backdrop-filter: blur(8px);
+  background: linear-gradient(180deg, rgba(24,24,30,0.92) 0%, rgba(13,13,17,0.96) 100%);
+  border: 1px solid rgba(255,255,255,0.07);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 20px 50px -30px rgba(0,0,0,0.9);
+}
+
+.panel-hover { transition: transform .5s cubic-bezier(.22,1,.36,1), border-color .3s, box-shadow .3s; }
+.panel-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.14);
+  box-shadow: 0 24px 60px -30px rgba(225,6,0,0.25);
+}
+
+.glass-pill {
+  background: rgba(14,14,19,0.72);
+  border: 1px solid rgba(255,255,255,0.09);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+/* speedline sweep across live tower header */
+.speedline {
+  position: relative;
+  overflow: hidden;
+}
+.speedline::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(225,6,0,0.35), transparent);
+  animation: speedline 2.4s linear infinite;
+  pointer-events: none;
+}
+
+/* marquee for race-control ticker */
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 30s linear infinite;
+}
+.marquee-track:hover { animation-play-state: paused; }
+
+/* Fail-safe: content is visible by default. JS enhances with motion.
+   (Never hide globally — if anime.js fails, the UI must still render.) */
+[data-anime], [data-scroll], [data-entrance] { opacity: 1; }
+
+/* timing row hover physics */
+.trow {
+  transition: transform .35s cubic-bezier(.22,1,.36,1), background-color .25s;
+}
+.trow:hover { transform: translateX(4px); }
+
+/* magnetic button base */
+.mag-btn { transition: box-shadow .3s, filter .3s; will-change: transform; }
+.mag-btn:hover { filter: brightness(1.1); }
+.mag-btn:active { filter: brightness(0.95); }
+
+/* range slider */
+input[type="range"].replay-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e10600 var(--fill, 0%), rgba(255,255,255,0.1) var(--fill, 0%));
+  outline: none;
+}
+input[type="range"].replay-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid #e10600;
+  box-shadow: 0 0 0 4px rgba(225,6,0,0.25), 0 4px 12px rgba(0,0,0,0.6);
+  cursor: grab;
+}
+input[type="range"].replay-range::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid #e10600;
+  cursor: grab;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track, .speedline::after { animation: none !important; }
+  [data-anime] { opacity: 1 !important; transform: none !important; }
 }

@@ -1,0 +1,224 @@
+/* Landing visual system — Anime.js philosophy expressed through Formula racing.
+   Warm charcoal canvas. Huge type. Thin lines. Bright functional data. No cards. */
+
+:root {
+  --lp-bg: #131210;
+  --lp-bg2: #0d0c0b;
+  --lp-ink: #f4f1ea;
+  --lp-muted: #a39e93;
+  --lp-faint: #6e6a61;
+  --lp-line: rgba(244, 241, 234, 0.1);
+  --lp-red: #ff2e1f;
+  --lp-purple: #b06bff;
+  --lp-green: #2be37c;
+  --lp-yellow: #f5c518;
+  --lp-cyan: #41d9f5;
+}
+
+.lp-root {
+  background: var(--lp-bg);
+  color: var(--lp-ink);
+  font-family: Outfit, system-ui, -apple-system, sans-serif;
+  overflow-x: clip;
+}
+
+.lp-root section[id] {
+  scroll-margin-top: 64px;
+}
+
+.lp-display {
+  font-family: "Space Grotesk", Outfit, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.lp-mono {
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-giant {
+  font-size: clamp(3.2rem, 10vw, 10rem);
+  line-height: 0.94;
+  font-weight: 700;
+}
+
+.lp-huge {
+  font-size: clamp(2.4rem, 6.5vw, 5.5rem);
+  line-height: 0.96;
+  font-weight: 700;
+}
+
+.lp-tech {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--lp-faint);
+  white-space: nowrap;
+}
+
+.lp-rule {
+  height: 1px;
+  background: var(--lp-line);
+  border: 0;
+}
+
+/* faint technical grid — shifts a few px with the pointer in the hero */
+.lp-grid-bg {
+  background-image:
+    linear-gradient(rgba(244, 241, 234, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(244, 241, 234, 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 90% 85% at 50% 40%, black 20%, transparent 75%);
+}
+
+.lp-noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.05;
+}
+
+/* minimal CTA — text + arrow, Anime.js style */
+.lp-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  color: var(--lp-ink);
+  padding: 0.9rem 0;
+  border-bottom: 2px solid var(--lp-red);
+  transition: gap 0.25s cubic-bezier(0.22, 1, 0.36, 1), color 0.2s, border-color 0.2s;
+}
+
+.lp-cta:hover {
+  gap: 1rem;
+  color: #fff;
+  border-color: #ff5a4d;
+}
+
+.lp-cta .lp-cta-arrow {
+  display: inline-block;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lp-cta:hover .lp-cta-arrow {
+  transform: translate(4px, -4px);
+}
+
+/* code snippet — the docs ARE the design */
+.lp-code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  background: #0b0a09;
+  border: 1px solid var(--lp-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lp-code-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--lp-line);
+}
+
+.lp-code pre {
+  padding: 14px 16px;
+  overflow-x: auto;
+  color: #cfc9bc;
+}
+
+.lp-tok-fn { color: #7dd3fc; }
+.lp-tok-str { color: #a5e8a5; }
+.lp-tok-num { color: #f5c518; }
+.lp-tok-kw { color: #ff8a7a; }
+.lp-tok-cm { color: #6e6a61; }
+
+/* nav */
+.lp-nav-link {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--lp-muted);
+  transition: color 0.2s;
+}
+
+.lp-nav-link:hover { color: var(--lp-ink); }
+
+/* chequered strip */
+.lp-chequer {
+  background-image:
+    linear-gradient(45deg, rgba(244, 241, 234, 0.9) 25%, transparent 25%, transparent 75%, rgba(244, 241, 234, 0.9) 75%),
+    linear-gradient(45deg, rgba(244, 241, 234, 0.9) 25%, transparent 25%, transparent 75%, rgba(244, 241, 234, 0.9) 75%);
+  background-color: #0d0c0b;
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+}
+
+/* draggable handle */
+.lp-handle {
+  cursor: grab;
+  touch-action: none;
+}
+
+.lp-handle:active { cursor: grabbing; }
+
+/* dot field buttons */
+.lp-shape-btn {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--lp-faint);
+  padding: 8px 2px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.lp-shape-btn:hover { color: var(--lp-ink); }
+
+.lp-shape-btn.active {
+  color: var(--lp-ink);
+  border-color: var(--lp-red);
+}
+
+/* focus */
+.lp-root a:focus-visible,
+.lp-root button:focus-visible,
+.lp-root [tabindex]:focus-visible {
+  outline: 2px solid var(--lp-cyan);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.lp-skip {
+  position: fixed;
+  top: -60px;
+  left: 12px;
+  z-index: 100;
+  background: var(--lp-ink);
+  color: #000;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 4px;
+  transition: top 0.2s;
+}
+
+.lp-skip:focus { top: 12px; }
+
+/* visible by default — motion enhances */
+[data-lp-reveal] { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-root *,
+  .lp-root *::before,
+  .lp-root *::after {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
+}
